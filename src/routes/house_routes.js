@@ -7,6 +7,9 @@ const router = express.Router();
 // Cria comunicação com o banco de dados (Importando conexão)
 const pool = require('../config/database.js');
 
+// Rota para gerenciar os cômodos (rooms) dentro de uma casa
+const roomRouter = require('./room_routes.js');
+
 // --- ROTAS DO TIPO GET ---
 
 // Rota para listar todas as casas do usuário
@@ -34,7 +37,7 @@ router.get('/:id', async (req, res) => {
   }
   try {
     // AJUSTE: Selecionando todas as colunas (*) e padronizando para minúsculas
-    const { rows } = await pool.query('SELECT * FROM casa WHERE id = $1 AND user_id = $2', [id, userId]);
+    const { rows } = await pool.query('SELECT * FROM casa WHERE casa_id = $1 AND user_id = $2', [id, userId]);
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário' });
     }
@@ -86,7 +89,7 @@ router.put('/:id', async (req, res) => {
   try {
     // AJUSTE: Padronizando para minúsculas
     const updatedHouse = await pool.query(
-      'UPDATE casa SET nome = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
+      'UPDATE casa SET nome = $1 WHERE casa_id = $2 AND user_id = $3 RETURNING *',
       [nome, id, userId]
     );
     if (updatedHouse.rows.length === 0) {
@@ -111,7 +114,7 @@ router.delete('/:id', async (req, res) => {
   }
   try {
     // AJUSTE: Padronizando para minúsculas
-    const deleteHouse = await pool.query('DELETE FROM casa WHERE id = $1 AND user_id = $2 RETURNING *', [id, userId]);
+    const deleteHouse = await pool.query('DELETE FROM casa WHERE casa_id = $1 AND user_id = $2 RETURNING *', [id, userId]);
     if (deleteHouse.rows.length === 0) {
       return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário.' });
     }
@@ -122,6 +125,12 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Rota para ser utilizada como "ponte" para os cômodos
+router.use('/:casaId/comodos', (req, res, next) => {
+  // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
+  req.casaId = req.params.casaId;
+  next();
+}, roomRouter);
 
 // Exporta o router para ser usado em outros arquivos
 module.exports = router;

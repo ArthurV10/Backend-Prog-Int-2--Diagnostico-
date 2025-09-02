@@ -6,7 +6,10 @@ var express = require('express'); // Cria um roteador Express para as Casas
 
 var router = express.Router(); // Cria comunicação com o banco de dados (Importando conexão)
 
-var pool = require('../config/database.js'); // --- ROTAS DO TIPO GET ---
+var pool = require('../config/database.js'); // Rota para gerenciar os cômodos (rooms) dentro de uma casa
+
+
+var roomRouter = require('./room_routes.js'); // --- ROTAS DO TIPO GET ---
 // Rota para listar todas as casas do usuário
 
 
@@ -79,7 +82,7 @@ router.get('/:id', function _callee2(req, res) {
         case 4:
           _context2.prev = 4;
           _context2.next = 7;
-          return regeneratorRuntime.awrap(pool.query('SELECT * FROM casa WHERE id = $1 AND user_id = $2', [id, userId]));
+          return regeneratorRuntime.awrap(pool.query('SELECT * FROM casa WHERE casa_id = $1 AND user_id = $2', [id, userId]));
 
         case 7:
           _ref2 = _context2.sent;
@@ -194,7 +197,7 @@ router.put('/:id', function _callee4(req, res) {
         case 5:
           _context4.prev = 5;
           _context4.next = 8;
-          return regeneratorRuntime.awrap(pool.query('UPDATE casa SET nome = $1 WHERE id = $2 AND user_id = $3 RETURNING *', [nome, id, userId]));
+          return regeneratorRuntime.awrap(pool.query('UPDATE casa SET nome = $1 WHERE casa_id = $2 AND user_id = $3 RETURNING *', [nome, id, userId]));
 
         case 8:
           updatedHouse = _context4.sent;
@@ -251,7 +254,7 @@ router["delete"]('/:id', function _callee5(req, res) {
         case 4:
           _context5.prev = 4;
           _context5.next = 7;
-          return regeneratorRuntime.awrap(pool.query('DELETE FROM casa WHERE id = $1 AND user_id = $2 RETURNING *', [id, userId]));
+          return regeneratorRuntime.awrap(pool.query('DELETE FROM casa WHERE casa_id = $1 AND user_id = $2 RETURNING *', [id, userId]));
 
         case 7:
           deleteHouse = _context5.sent;
@@ -286,6 +289,12 @@ router["delete"]('/:id', function _callee5(req, res) {
       }
     }
   }, null, null, [[4, 13]]);
-}); // Exporta o router para ser usado em outros arquivos
+}); // Rota para ser utilizada como "ponte" para os cômodos
+
+router.use('/:casaId/comodos', function (req, res, next) {
+  // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
+  req.casaId = req.params.casaId;
+  next();
+}, roomRouter); // Exporta o router para ser usado em outros arquivos
 
 module.exports = router;
