@@ -4,117 +4,133 @@ const express = require('express');
 // Cria um roteador Express para as Casas
 const router = express.Router();
 
-// Cria comunicação com o banco de dados (Importando conxeão)
+// Cria comunicação com o banco de dados (Importando conexão)
 const pool = require('../config/database.js');
-const { errorMonitor } = require('events');
 
+// Rota para gerenciar os cômodos (rooms) dentro de uma casa
+const roomRouter = require('./room_routes.js');
 
-// Rotas do tipo GET
+// --- ROTAS DO TIPO GET ---
 
-// Rota para listar todas as casas
+// Rota para listar todas as casas do usuário
 router.get('/', async (req, res) => {
-  try {
-    const {rows} = await pool.query('SELECT * FROM casa');
-    res.status(200).json(rows);
+  const userId = req.userId; // Obtém o userId do objeto de requisição
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID não fornecido' });
   }
-  catch (error) {
-    console.error('Erro ao buscar casas: ', error);
-    res.status(500).json({message: 'Erro ao buscar dados do banco'});
+  try {
+    // AJUSTE: Padronizando para minúsculas
+    const { rows } = await pool.query('SELECT * FROM casa WHERE user_id = $1', [userId]);
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('Erro ao buscar casas do usuário: ', error);
+    res.status(500).json({ message: 'Erro ao buscar dados do banco' });
   }
 });
 
 // Rota para ver os detalhes de uma casa
-// GET /api/casas/:id
-router.get('/:id', async(req, res) => {
-  const {id} = req.params;
-  try{
-    const {rows} = await pool.query('SELECT CASA_ID FROM CASA WHERE ID = $1', [id]);
-    if (rows.length === 0){
-      return res.status(404).json({message: 'Casa não encontrada'});
-    }
-
-    res.status(200).json(rows[0]);
+router.get('/:id', async (req, res) => {
+  const userId = req.userId; // Obtém o userId do objeto de requisição
+  const { id } = req.params;
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID não fornecido' });
   }
-  catch (error){
+  try {
+    // AJUSTE: Selecionando todas as colunas (*) e padronizando para minúsculas
+    const { rows } = await pool.query('SELECT * FROM casa WHERE casa_id = $1 AND user_id = $2', [id, userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário' });
+    }
+    res.status(200).json(rows[0]);
+  } catch (error) {
     console.log('Erro ao buscar casa: ', error);
-    res.status(500).json({message: 'Erro ao buscar dados do banco'});
+    res.status(500).json({ message: 'Erro ao buscar dados do banco' });
   }
 });
 
-
-// Rotas do Tipo POST
+// --- ROTAS DO TIPO POST ---
 
 // Rota para adicionar uma nova casa
-router.post('/', async(req, res) =>{
-  // Pega os dados da requisição, JSON no body
-  const {nome, user_id} = req.body;
-  
-  if(!nome){
-    return res.status(400).json({message: 'O campo "nome" é obrigatório'});
+router.post('/', async (req, res) => {
+  const { nome } = req.body;
+  const userId = req.userId; // ÓTIMO: Usando o userId da requisição para segurança
+
+  if (!nome) {
+    return res.status(400).json({ message: 'O campo "nome" é obrigatório' });
   }
-  if(!user_id){
-    return res.status(400).json({message: 'O campo "user_id" é obrigatório'});
+  if (!userId) {
+    // Esta validação é uma segurança extra
+    return res.status(400).json({ message: 'Não foi possível identificar o usuário da requisição' });
   }
-  try{
-    const newHouse = await pool.query('INSERT INTO CASA (NOME, USER_ID) VALUES ($1, $2) RETURNING *',
-      [nome, user_id]
+  try {
+    // AJUSTE: Padronizando para minúsculas
+    const newHouse = await pool.query(
+      'INSERT INTO casa (nome, user_id) VALUES ($1, $2) RETURNING *',
+      [nome, userId]
     );
     res.status(201).json(newHouse.rows[0]);
-  }
-  catch (error){
+  } catch (error) {
     console.log('Erro ao adicionar nova casa no banco: ', error);
-    res.status(500).json({message: 'Erro ao adicionar casa no banco'});
+    res.status(500).json({ message: 'Erro ao adicionar casa no banco' });
   }
 });
 
-// Rotas do Tipo PUT
+// --- ROTAS DO TIPO PUT ---
 
-// EDITAR (atualizar) uma casa existente
-// PUT /api/casas/:id
+// Rota para editar uma casa existente
 router.put('/:id', async (req, res) => {
+  const userId = req.userId;
   const { id } = req.params;
-  const { nome } = req.body; 
+  const { nome } = req.body;
 
   if (!nome) {
     return res.status(400).json({ message: 'O campo "nome" é obrigatório.' });
   }
-
   try {
+    // AJUSTE: Padronizando para minúsculas
     const updatedHouse = await pool.query(
-      'UPDATE Casa SET nome = $1 WHERE id = $2 RETURNING *',
-      [nome, id]
+      'UPDATE casa SET nome = $1 WHERE casa_id = $2 AND user_id = $3 RETURNING *',
+      [nome, id, userId]
     );
-
     if (updatedHouse.rows.length === 0) {
-      return res.status(404).json({ message: 'Casa não encontrada.' });
+      return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário.' });
     }
-
     res.status(200).json(updatedHouse.rows[0]);
-
   } catch (error) {
     console.error('Erro ao editar casa:', error);
     res.status(500).json({ message: 'Erro ao editar casa no banco' });
   }
 });
 
-// Rotas do Tipo DELETE
+// --- ROTAS DO TIPO DELETE ---
 
 // Rota para deletar uma casa existente
-// DELETE /api/casas/:id
-router.delete('/:id', async (req, res) =>{
-  const {id} = req.params;
-  try{
-    const deleteHouse = await pool.query('DELETE FROM CASA WHERE ID = $1 RETURNING *', [id]);
-    if (deleteHouse.rows.length === 0){
-      return res.status(404).json({message: 'Casa não encontrada'});
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID não fornecido.' });
+  }
+  try {
+    // AJUSTE: Padronizando para minúsculas
+    const deleteHouse = await pool.query('DELETE FROM casa WHERE casa_id = $1 AND user_id = $2 RETURNING *', [id, userId]);
+    if (deleteHouse.rows.length === 0) {
+      return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário.' });
     }
-    res.status(200).json({message: 'Casa deletada com sucesso!'});
+    res.status(200).json({ message: 'Casa deletada com sucesso!' });
   } catch (error) {
     console.error('Erro ao deletar casa:', error);
     res.status(500).json({ message: 'Erro ao deletar casa no banco' });
   }
 });
 
+// Rota para ser utilizada como "ponte" para os cômodos
+router.use('/:casaId/comodos', (req, res, next) => {
+  // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
+  req.casaId = req.params.casaId;
+  next();
+}, roomRouter);
 
 // Exporta o router para ser usado em outros arquivos
 module.exports = router;

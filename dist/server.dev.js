@@ -1,11 +1,10 @@
 "use strict";
 
-require('dotenv').config(); // Linha de diagnóstico final:
+require('dotenv').config(); // Habilita o CORS (Cross-Origin Resource Sharing)
 
 
-console.log('--- VARIÁVEIS CARREGADAS DO .ENV ---');
-console.log(process.env);
-console.log('-----------------------------------'); // Importa o framework Express
+var cors = require('cors'); // Importa o framework Express
+
 
 var express = require('express'); // Cria uma aplicação Express
 
@@ -14,21 +13,24 @@ var app = express(); // Define a porta em que o servidor irá escutar
 
 var PORT = process.env.PORT || 3000; // Importa os arquivos de rotas
 
+var userRoutes = require('./src/routes/user_routes.js');
+
 var houseRoutes = require('./src/routes/house_routes.js');
 
-var roomRoutes = require('./src/routes/room_routes.js');
-
-var deviceRoutes = require('./src/routes/device_routes.js');
-
-var sceneRoutes = require('./src/routes/scene_routes.js'); // Permite o express ler o corpo das requisições (Consegue ler JSON no body)
+var roomRoutes = require('./src/routes/room_routes.js'); // const deviceRoutes = require('./src/routes/device_routes.js');
+// const sceneRoutes = require('./src/routes/scene_routes.js')
+// Permite utilizar o CORS
 
 
-app.use(express.json()); // Requisições feitas para api/house vai para houseRoutes
+app.use(cors()); // Permite o express ler o corpo das requisições (Consegue ler JSON no body)
 
+app.use(express.json()); // Requisições feitas para api/user vai para userRoutes
+
+app.use('/api/user', userRoutes);
 app.use('/api/house', houseRoutes);
-app.use('/api/room', roomRoutes);
-app.use('/api/device', deviceRoutes);
-app.use('/api/scene', sceneRoutes); // Rota para o caminho raiz da API
+app.use('/api/room', roomRoutes); // app.use('/api/device', deviceRoutes);
+// app.use('/api/scene', sceneRoutes);
+// Rota para o caminho raiz da API
 
 app.get('/', function (req, res) {
   res.send('Bem-vindo à API Home Nexus!');
