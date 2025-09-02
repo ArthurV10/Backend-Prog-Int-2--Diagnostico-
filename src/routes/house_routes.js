@@ -24,6 +24,7 @@ router.get('/', async (req, res) => {
 });
 
 // Rota para ver os detalhes de uma casa
+// GET /api/casas/:id
 router.get('/:id', async(req, res) => {
   const {id} = req.params;
   try{
@@ -68,20 +69,52 @@ router.post('/', async(req, res) =>{
 
 // Rotas do Tipo PUT
 
-// Editar informações de casa
-router.put('/', async(req, res) => {
-  const [newName, casa_id] = req.body;
+// EDITAR (atualizar) uma casa existente
+// PUT /api/casas/:id
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nome } = req.body; 
 
-  if (newName){
-    return res.status(400).json({message : 'O campo "Novo Nome" é obrigatório'})
+  if (!nome) {
+    return res.status(400).json({ message: 'O campo "nome" é obrigatório.' });
   }
 
-  const updatedHouse = await pool.query('UPDATE CASA SET NOME = $1 WHERE CASA_ID = $2 RETURNIG NOME',
-    [newName, casa_id])
+  try {
+    const updatedHouse = await pool.query(
+      'UPDATE Casa SET nome = $1 WHERE id = $2 RETURNING *',
+      [nome, id]
+    );
+
+    if (updatedHouse.rows.length === 0) {
+      return res.status(404).json({ message: 'Casa não encontrada.' });
+    }
+
     res.status(200).json(updatedHouse.rows[0]);
-})
+
+  } catch (error) {
+    console.error('Erro ao editar casa:', error);
+    res.status(500).json({ message: 'Erro ao editar casa no banco' });
+  }
+});
 
 // Rotas do Tipo DELETE
+
+// Rota para deletar uma casa existente
+// DELETE /api/casas/:id
+router.delete('/:id', async (req, res) =>{
+  const {id} = req.params;
+  try{
+    const deleteHouse = await pool.query('DELETE FROM CASA WHERE ID = $1 RETURNING *', [id]);
+    if (deleteHouse.rows.length === 0){
+      return res.status(404).json({message: 'Casa não encontrada'});
+    }
+    res.status(200).json({message: 'Casa deletada com sucesso!'});
+  } catch (error) {
+    console.error('Erro ao deletar casa:', error);
+    res.status(500).json({ message: 'Erro ao deletar casa no banco' });
+  }
+});
+
 
 // Exporta o router para ser usado em outros arquivos
 module.exports = router;
