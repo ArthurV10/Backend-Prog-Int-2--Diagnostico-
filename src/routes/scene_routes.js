@@ -113,7 +113,6 @@ router.post('/', async (req, res) => {
 // Rota para EDITAR uma cena e suas ações
 // Ex: PUT /api/user/1/houses/5/scenes/10
 router.put('/:id', async (req, res) => {
-    const { casaId } = req;
     const { id } = req.params; // ID da cena
     const { nome, ativa, acoes } = req.body;
 
@@ -127,8 +126,8 @@ router.put('/:id', async (req, res) => {
         await client.query('BEGIN');
 
         // 1. Atualiza os dados da cena principal
-        const cenaQuery = 'UPDATE cena SET nome = $1, ativa = $2 WHERE cena_id = $3 AND casa_id = $4 RETURNING *';
-        const cenaResult = await client.query(cenaQuery, [nome, ativa, id, casaId]);
+        const cenaQuery = 'UPDATE cena SET nome = $1, ativa = $2 WHERE cena_id = $3 RETURNING *';
+        const cenaResult = await client.query(cenaQuery, [nome, ativa, id]);
 
         if (cenaResult.rows.length === 0) {
             throw new Error('Cena não encontrada ou não pertence a esta casa.');
@@ -145,7 +144,7 @@ router.put('/:id', async (req, res) => {
         
         await client.query('COMMIT');
         
-        res.status(200).json({ cena_id: id, nome, ativa, casa_id: casaId, acoes });
+        res.status(200).json({ cena_id: id, nome, ativa, acoes });
 
     } catch (error) {
         await client.query('ROLLBACK');
@@ -181,6 +180,71 @@ router.delete('/:id', async (req, res) => {
     console.error('Erro ao deletar cena: ', error);
     res.status(500).json({ message: 'Erro ao deletar dados do banco' });
   }
+});
+
+// --- ROTAS NOVAS PARA FUNCIONALIDADES EXTRAS ---
+
+// Função auxiliar para criar pausas (delay)
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ROTA PATCH: Ativar ou desativar uma cena
+router.patch('/:id/toggle', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Busca o estado atual da cena
+        const currentState = await pool.query('SELECT ativa FROM cena WHERE cena_id = $1', [id]);
+        if (currentState.rows.length === 0) {
+            return res.status(404).json({ message: 'Cena não encontrada.' });
+        }
+        
+        // Inverte o estado atual
+        const novoEstado = !currentState.rows[0].ativa;
+
+        // Atualiza o banco de dados com o novo estado
+        const { rows } = await pool.query(
+            'UPDATE cena SET ativa = $1 WHERE cena_id = $2 RETURNING *',
+            [novoEstado, id]
+        );
+        res.status(200).json(rows[0]);
+
+    } catch (error) {
+        console.error('Erro ao alterar estado da cena:', error);
+        res.status(500).json({ message: 'Erro interno no servidor.' });
+    }
+});
+
+// ROTA POST: Executar as ações de uma cena
+router.post('/:id/execute', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // 1. Verifica se a cena existe e se está ativa
+        const cenaRes = await pool.query('SELECT * FROM cena WHERE cena_id = $1', [id]);
+        if (cenaRes.rows.length === 0) {
+            return res.status(404).json({ message: 'Cena não encontrada.' });
+        }
+        if (!cenaRes.rows[0].ativa) {
+            return res.status(400).json({ message: 'A cena está inativa e não pode ser executada.' });
+        }
+
+        // 2. Busca todas as ações da cena
+        const acoesRes = await pool.query('SELECT * FROM acao_cena WHERE cena_id = $1 ORDER BY ordem ASC', [id]);
+        
+        // 3. Responde imediatamente ao frontend para não deixá-lo esperando
+        res.status(202).json({ message: 'Execução da cena iniciada.' });
+
+        // 4. Executa as ações em segundo plano (assincronamente)
+        (async () => {
+            for (const acao of acoesRes.rows) {
+                if (acao.delay_ms > 0) {
+                    await wait(acao.delay_ms);
+                }
+                await pool.query('UPDATE dispositivo SET ligado = $1 WHERE dispos_id = $2', [acao.ligado_desejado, acao.dispos_id]);
+            }
+        })();
+
+    } catch (error) {
+        console.error('Erro ao iniciar execução da cena:', error);
+    }
 });
 
 module.exports = router;
