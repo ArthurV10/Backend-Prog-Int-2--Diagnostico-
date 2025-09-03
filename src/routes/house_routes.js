@@ -49,6 +49,37 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// Rota para listar TODOS os dispositivos de uma casa
+router.get('/:id/device', async (req, res) => {
+    const userId = req.userId;
+    const { id } = req.params; // ID da casa
+
+    if (!userId) {
+        return res.status(400).json({ message: 'User ID não fornecido' });
+    }
+
+    try {
+        const query = `
+            SELECT d.* FROM dispositivo d
+            INNER JOIN comodo c ON d.comodo_id = c.comodo_id
+            WHERE c.casa_id = $1
+        `;
+        const { rows } = await pool.query(query, [id]);
+        
+        // Antes de enviar a resposta, podemos verificar se a casa pertence ao usuário para segurança extra
+        const casaCheck = await pool.query('SELECT 1 FROM casa WHERE casa_id = $1 AND user_id = $2', [id, userId]);
+        if (casaCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Casa não encontrada ou não pertence ao usuário' });
+        }
+
+        res.status(200).json(rows);
+    } catch (error) {
+        console.error('Erro ao buscar todos os dispositivos da casa: ', error);
+        res.status(500).json({ message: 'Erro ao buscar dados do banco' });
+    }
+});
+
 // --- ROTAS DO TIPO POST ---
 
 // Rota para adicionar uma nova casa
