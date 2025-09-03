@@ -125,7 +125,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Rota para ser utilizada como "ponte" para os dispositivos
-router.use('/:comodoId/devices', (req, res, next) => {
+router.use('/:comodoId/device', (req, res, next) => {
   // Anexa o ID do cômodo na requisição para que o próximo roteador possa usá-lo
   req.comodoId = req.params.comodoId;
   next();

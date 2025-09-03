@@ -134,7 +134,7 @@ router.use('/:casaId/rooms', (req, res, next) => {
 }, roomRouter);
 
 // Rota para ser utilizada como "ponte" para as cenas
-router.use('/:casaId/scenes', (req, res, next) => {
+router.use('/:casaId/scene', (req, res, next) => {
   // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
   req.casaId = req.params.casaId;
   next();
