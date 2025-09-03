@@ -78,8 +78,8 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN'); // Inicia a transação
 
     // 1. Insere a cena principal na tabela 'cena'
-    const cenaQuery = 'INSERT INTO cena (nome, ativa, casa_id) VALUES ($1, $2, $3) RETURNING cena_id';
-    const cenaResult = await client.query(cenaQuery, [nome, ativa, casaId]);
+    const cenaQuery = 'INSERT INTO cena (nome, ativa) VALUES ($1, $2) RETURNING cena_id';
+    const cenaResult = await client.query(cenaQuery, [nome, ativa]);
     const novaCenaId = cenaResult.rows[0].cena_id;
 
     // 2. Itera sobre o array de ações e insere cada uma na tabela 'acao_cena'
@@ -163,8 +163,8 @@ router.delete('/:id', async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      'DELETE FROM cena WHERE cena_id = $1 AND casa_id = $2 RETURNING *',
-      [id, casaId]
+      'DELETE FROM cena WHERE cena_id = $1 RETURNING *',
+      [id]
     );
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Cena não encontrada ou não pertence a esta casa.' });
