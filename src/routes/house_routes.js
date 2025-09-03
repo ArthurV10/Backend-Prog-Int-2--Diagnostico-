@@ -9,6 +9,7 @@ const pool = require('../config/database.js');
 
 // Rota para gerenciar os cômodos (rooms) dentro de uma casa
 const roomRouter = require('./room_routes.js');
+const sceneRouter = require('./scene_routes.js');
 
 // --- ROTAS DO TIPO GET ---
 
@@ -126,11 +127,18 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Rota para ser utilizada como "ponte" para os cômodos
-router.use('/:casaId/comodos', (req, res, next) => {
+router.use('/:casaId/rooms', (req, res, next) => {
   // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
   req.casaId = req.params.casaId;
   next();
 }, roomRouter);
+
+// Rota para ser utilizada como "ponte" para as cenas
+router.use('/:casaId/scenes', (req, res, next) => {
+  // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
+  req.casaId = req.params.casaId;
+  next();
+}, sceneRouter);
 
 // Exporta o router para ser usado em outros arquivos
 module.exports = router;

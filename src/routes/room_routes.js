@@ -38,7 +38,7 @@ router.get('/:id', async (req, res) => {
     return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
   }
   try {
-    const { rows } = await pool.query('SELECT * FROM comodo WHERE id = $1 AND casa_id = $2', [id, casaId]);
+    const { rows } = await pool.query('SELECT * FROM comodo WHERE comodo_id = $1 AND casa_id = $2', [id, casaId]);
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Cômodo não encontrado ou não pertence a esta casa.' });
     }
@@ -88,7 +88,7 @@ router.put('/:id', async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      'UPDATE comodo SET nome = $1 WHERE id = $2 AND casa_id = $3 RETURNING *',
+      'UPDATE comodo SET nome = $1 WHERE comodo_id = $2 AND casa_id = $3 RETURNING *',
       [nome, id, casaId]
     );
     if (rows.length === 0) {
@@ -111,7 +111,7 @@ router.delete('/:id', async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      'DELETE FROM comodo WHERE id = $1 AND casa_id = $2 RETURNING *',
+      'DELETE FROM comodo WHERE comodo_id = $1 AND casa_id = $2 RETURNING *',
       [id, casaId]
     );
     if (rows.length === 0) {
@@ -125,7 +125,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Rota para ser utilizada como "ponte" para os dispositivos
-router.use('/:comodoId/dispositivos', (req, res, next) => {
+router.use('/:comodoId/devices', (req, res, next) => {
   // Anexa o ID do cômodo na requisição para que o próximo roteador possa usá-lo
   req.comodoId = req.params.comodoId;
   next();

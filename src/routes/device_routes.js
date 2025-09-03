@@ -4,131 +4,140 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database.js');
 
-// Rota para gerenciar os dispositivos dentro de um cômodo
-const deviceRouter = require('./device_routes.js');
-
 // ROTAS DO TIPO GET
 
-// Rota para LISTAR todos os cômodos de uma casa específica
-// Ex: GET /api/user/1/houses/5/comodos
+// Rota para LISTAR todos os dispositivos de um cômodo específico
+// Ex: GET /api/user/1/houses/5/comodos/10/devices
 router.get('/', async (req, res) => {
-  // Pega o ID da casa que foi injetado pelo roteador anterior (house_routes.js)
-  const { casaId } = req; 
-
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
+  // Pega o ID do cômodo que foi injetado pelo roteador anterior (house_routes.js)
+  const { comodoId } = req;
+  if (!comodoId) {
+    return res.status(400).json({ message: 'ID do cômodo não fornecido na rota.' });
   }
-
   try {
-    const { rows } = await pool.query('SELECT * FROM comodo WHERE casa_id = $1', [casaId]);
+    const { rows } = await pool.query('SELECT * FROM dispositivo WHERE comodo_id = $1', [comodoId]);
     res.status(200).json(rows);
   } catch (error) {
-    console.error('Erro ao buscar cômodos da casa:', error);
+    console.error('Erro ao buscar dispositivos do cômodo:', error);
     res.status(500).json({ message: 'Erro ao buscar dados do banco' });
   }
 });
 
-// Rota para PEGAR os detalhes de um cômodo específico
-// Ex: GET /api/user/1/houses/5/comodos/10
+// Rota para PEGAR os detalhes de um dispositivo específico
+// Ex: GET /api/user/1/houses/5/comodos/10/devices/15
 router.get('/:id', async (req, res) => {
-  const { casaId } = req; // ID da casa vindo da "ponte"
-  const { id } = req.params; // ID do cômodo vindo da URL
+  const { comodoId } = req; // ID do cômodo vindo da "ponte"
+  const { id } = req.params; // ID do dispositivo vindo da URL
 
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
+  if (!comodoId) {
+    return res.status(400).json({ message: 'ID do cômodo não fornecido na rota.' });
   }
   try {
-    const { rows } = await pool.query('SELECT * FROM comodo WHERE id = $1 AND casa_id = $2', [id, casaId]);
+    const { rows } = await pool.query('SELECT * FROM dispositivo WHERE comodo_id = $1 AND dispos_id = $2', [comodoId, id]);
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Cômodo não encontrado ou não pertence a esta casa.' });
+      return res.status(404).json({ message: 'Dispositivo não encontrado.' });
     }
     res.status(200).json(rows[0]);
   } catch (error) {
-    console.error('Erro ao buscar cômodo:', error);
+    console.error('Erro ao buscar dispositivo do cômodo:', error);
     res.status(500).json({ message: 'Erro ao buscar dados do banco' });
   }
 });
 
 // ROTAS DO TIPO POST
 
-// Rota para ADICIONAR um novo cômodo a uma casa específica
-// Ex: POST /api/user/1/houses/5/comodos
+// Rota para ADICIONAR um novo dispositivo a um cômodo específico
+// Ex: POST /api/user/1/houses/5/comodos/10/devices
 router.post('/', async (req, res) => {
-  const { nome } = req.body;
-  const { casaId } = req; // ID da casa vindo da "ponte"
+  const { nome, tipo } = req.body;
+  const { comodoId } = req; // ID do cômodo vindo da "ponte"
   if (!nome) {
     return res.status(400).json({ message: 'O campo "nome" é obrigatório' });
   }
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
-  }
   try {
-    const { rows } = await pool.query(
-      'INSERT INTO comodo (nome, casa_id) VALUES ($1, $2) RETURNING *',
-      [nome, casaId]
-    );
+    const { rows } = await pool.query('INSERT INTO dispositivo (nome, tipo, comodo_id) VALUES ($1, $2, $3) RETURNING *',
+      [nome, tipo, comodoId]);
     res.status(201).json(rows[0]);
   } catch (error) {
-    console.error('Erro ao adicionar cômodo:', error);
-    res.status(500).json({ message: 'Erro ao adicionar cômodo ao banco' });
+    console.error('Erro ao adicionar dispositivo ao cômodo:', error);
+    res.status(500).json({ message: 'Erro ao adicionar dados ao banco' });
   }
 });
 
 // ROTAS DO TIPO PUT
-// Rota para ATUALIZAR um cômodo específico
+
+// Rota para ATUALIZAR um dispositivo específico em um cômodo
+// Ex: PUT /api/user/1/houses/5/comodos/10/devices/15
+// Pode receber 'nome', 'ligado', ou ambos.
 router.put('/:id', async (req, res) => {
-  const { nome } = req.body;
-  const { casaId } = req; // ID da casa vindo da "ponte"
-  const { id } = req.params; // ID do cômodo vindo da URL
-  if (!nome) {
-    return res.status(400).json({ message: 'O campo "nome" é obrigatório' });
+  const { comodoId } = req;     // ID do cômodo vindo da "ponte"
+  const { id } = req.params;   // ID do dispositivo vindo da URL
+  const { nome, ligado } = req.body; // Campos que podem ser atualizados
+
+  // Verifica se pelo menos um campo foi enviado para atualização
+  if (nome === undefined && ligado === undefined) {
+    return res.status(400).json({ message: 'Nenhum dado fornecido para atualização.' });
   }
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
+
+  // --- Lógica para construir a query dinâmica ---
+  const camposParaAtualizar = [];
+  const valores = [];
+  let contadorDeParametros = 1;
+
+  if (nome !== undefined) {
+    camposParaAtualizar.push(`nome = $${contadorDeParametros}`);
+    valores.push(nome);
+    contadorDeParametros++;
   }
+
+  if (ligado !== undefined) {
+    camposParaAtualizar.push(`ligado = $${contadorDeParametros}`);
+    valores.push(ligado);
+    contadorDeParametros++;
+  }
+  // --- Fim da lógica da query ---
+
+  // Adiciona os IDs para a cláusula WHERE
+  valores.push(id);
+  valores.push(comodoId);
+
+  const querySQL = `
+    UPDATE dispositivo 
+    SET ${camposParaAtualizar.join(', ')} 
+    WHERE dispos_id = $${contadorDeParametros} AND comodo_id = $${contadorDeParametros + 1} 
+    RETURNING *
+  `; 
   try {
-    const { rows } = await pool.query(
-      'UPDATE comodo SET nome = $1 WHERE id = $2 AND casa_id = $3 RETURNING *',
-      [nome, id, casaId]
-    );
+    const { rows } = await pool.query(querySQL, valores);
+
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Cômodo não encontrado ou não pertence a esta casa.' });
+      return res.status(404).json({ message: 'Dispositivo não encontrado ou não pertence a este cômodo.' });
     }
+
     res.status(200).json(rows[0]);
   } catch (error) {
-    console.error('Erro ao atualizar cômodo:', error);
-    res.status(500).json({ message: 'Erro ao atualizar cômodo no banco' });
+    console.error('Erro ao atualizar dispositivo:', error);
+    res.status(500).json({ message: 'Erro ao atualizar dados no banco' });
   }
 });
+
 
 // ROTAS DO TIPO DELETE
-// Rota para DELETAR um cômodo específico
+// Rota para DELETAR um dispositivo específico de um cômodo
+// Ex: DELETE /api/user/1/houses/5/comodos/10/devices/15
 router.delete('/:id', async (req, res) => {
-  const { casaId } = req;
-  const { id } = req.params; // ID do cômodo vindo da URL
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
-  }
+  const { comodoId } = req; // ID do cômodo vindo da "ponte"
+  const { id } = req.params; // ID do dispositivo vindo da URL
   try {
-    const { rows } = await pool.query(
-      'DELETE FROM comodo WHERE id = $1 AND casa_id = $2 RETURNING *',
-      [id, casaId]
-    );
+    const { rows } = await pool.query('DELETE FROM dispositivo WHERE dispos_id = $1 AND comodo_id = $2 RETURNING *', [id, comodoId]);
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Cômodo não encontrado ou não pertence a esta casa.' });
+      return res.status(404).json({ message: 'Dispositivo não encontrado ou não pertence a este cômodo.' });
     }
-    res.status(200).json({ message: 'Cômodo deletado com sucesso!' });
+    res.status(204).send(); // Resposta vazia para sucesso
   } catch (error) {
-    console.error('Erro ao deletar cômodo:', error);
-    res.status(500).json({ message: 'Erro ao deletar cômodo no banco' });
+    console.error('Erro ao deletar dispositivo:', error);
+    res.status(500).json({ message: 'Erro ao deletar dados no banco' });
   }
 });
-
-// Rota para ser utilizada como "ponte" para os dispositivos
-router.use('/:comodoId/dispositivos', (req, res, next) => {
-  // Anexa o ID do cômodo na requisição para que o próximo roteador possa usá-lo
-  req.comodoId = req.params.comodoId;
-  next();
-}, deviceRouter);
 
 module.exports = router;
