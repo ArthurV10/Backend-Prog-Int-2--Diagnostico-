@@ -49,7 +49,27 @@ router.get('/:id', async (req, res) => {
         }
 
         // 2. Busca as ações associadas a essa cena
-        const acoesQuery = 'SELECT * FROM acao_cena WHERE cena_id = $1 ORDER BY ordem ASC';
+        const acoesQuery = `
+          SELECT
+              ac.acao_id,
+              ac.cena_id,
+              ac.dispos_id,
+              ac.ordem,
+              ac.ligado_desejado,
+              ac.delay_ms,
+              d.nome AS dispositivo_nome,
+              co.nome AS comodo_nome
+          FROM
+              acao_cena AS ac
+          JOIN
+              dispositivo AS d ON ac.dispos_id = d.dispos_id
+          JOIN
+              comodo AS co ON d.comodo_id = co.comodo_id
+          WHERE
+              ac.cena_id = $1
+          ORDER BY
+              ac.ordem ASC;
+      `;
         const acoesResult = await pool.query(acoesQuery, [id]);
 
         // 3. Monta o objeto final da cena com o array de ações dentro dele
