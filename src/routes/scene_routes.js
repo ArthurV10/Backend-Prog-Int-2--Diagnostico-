@@ -37,26 +37,33 @@ router.get('/', async (req, res) => {
 // Rota para ver os detalhes de uma cena específica
 // Ex: GET /api/user/1/houses/5/scenes/10
 router.get('/:id', async (req, res) => {
-  const { id } = req.params; // ID da cena vindo da URL
-  const { casaId } = req; // Pega o ID da casa que foi injetado pelo roteador anterior (house_routes.js)
-  if (!casaId) {
-    return res.status(400).json({ message: 'ID da casa não fornecido na rota.' });
-  }
-  const querySQL = `
-    SELECT DISTINCT cena.*
-    FROM cena
-    INNER JOIN acao_cena ON cena.cena_id = acao_cena.cena_id
-    INNER JOIN dispositivo ON acao_cena.dispos_id = dispositivo.dispos_id
-    INNER JOIN comodo ON dispositivo.comodo_id = comodo.comodo_id
-    WHERE comodo.casa_id = $1 AND cena.cena_id = $2;
-  `;
-  try {
-    const { rows } = await pool.query(querySQL, [casaId, id]);
-    res.status(200).json(rows);
-  } catch (error) {
-    console.error('Erro ao buscar cenas: ', error);
-    res.status(500).json({ message: 'Erro ao buscar dados do banco' });
-  }
+    const { id } = req.params; // ID da cena vindo da URL
+
+    try {
+        // 1. Busca os dados da cena
+        const cenaQuery = 'SELECT * FROM cena WHERE cena_id = $1';
+        const cenaResult = await pool.query(cenaQuery, [id]);
+
+        if (cenaResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Cena não encontrada.' });
+        }
+
+        // 2. Busca as ações associadas a essa cena
+        const acoesQuery = 'SELECT * FROM acao_cena WHERE cena_id = $1 ORDER BY ordem ASC';
+        const acoesResult = await pool.query(acoesQuery, [id]);
+
+        // 3. Monta o objeto final da cena com o array de ações dentro dele
+        const cena = cenaResult.rows[0];
+        cena.acoes = acoesResult.rows;
+
+
+        // 4. Retorna o objeto completo
+        res.status(200).json(cena);
+
+    } catch (error) {
+        console.error('Erro ao buscar detalhes da cena:', error);
+        res.status(500).json({ message: 'Erro ao buscar dados do banco' });
+    }
 });
 
 // Rotas do Tipo POST
