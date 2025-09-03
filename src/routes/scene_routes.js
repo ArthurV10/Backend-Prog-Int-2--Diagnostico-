@@ -83,9 +83,9 @@ router.post('/', async (req, res) => {
     const novaCenaId = cenaResult.rows[0].cena_id;
 
     // 2. Itera sobre o array de ações e insere cada uma na tabela 'acao_cena'
-    const acaoQuery = 'INSERT INTO acao_cena (cena_id, dispo_id, ordem, ligado_desejado, delay) VALUES ($1, $2, $3, $4, $5)';
+    const acaoQuery = 'INSERT INTO acao_cena (cena_id, dispos_id, ordem, ligado_desejado, delay_ms) VALUES ($1, $2, $3, $4, $5)';
     for (const [index, acao] of acoes.entries()) {
-      await client.query(acaoQuery, [novaCenaId, acao.dispo_id, index, acao.ligado_desejado, acao.delay]);
+      await client.query(acaoQuery, [novaCenaId, acao.dispos_id, index, acao.ligado_desejado, acao.delay_ms]);
     }
 
     await client.query('COMMIT'); // Se tudo deu certo, salva as alterações permanentemente
@@ -131,9 +131,9 @@ router.put('/:id', async (req, res) => {
         await client.query('DELETE FROM acao_cena WHERE cena_id = $1', [id]);
 
         // 3. Insere as novas ações
-        const acaoQuery = 'INSERT INTO acao_cena (cena_id, dispo_id, ordem, ligado_desejado, delay) VALUES ($1, $2, $3, $4, $5)';
+        const acaoQuery = 'INSERT INTO acao_cena (cena_id, dispos_id, ordem, ligado_desejado, delay_ms) VALUES ($1, $2, $3, $4, $5)';
         for (const [index, acao] of acoes.entries()) {
-            await client.query(acaoQuery, [id, acao.dispo_id, index, acao.ligado_desejado, acao.delay]);
+            await client.query(acaoQuery, [id, acao.dispos_id, index, acao.ligado_desejado, acao.delay_ms]);
         }
         
         await client.query('COMMIT');
