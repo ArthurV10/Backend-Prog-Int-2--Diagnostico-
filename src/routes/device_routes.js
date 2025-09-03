@@ -47,16 +47,16 @@ router.get('/:id', async (req, res) => {
 // ROTAS DO TIPO POST
 
 // Rota para ADICIONAR um novo dispositivo a um cômodo específico
-// Ex: POST /api/user/1/houses/5/comodos/10/devices
+// Ex: POST /api/user/1/houses/5/comodos/10/device
 router.post('/', async (req, res) => {
-  const { nome, tipo } = req.body;
+  const { nome, ligado } = req.body;
   const { comodoId } = req; // ID do cômodo vindo da "ponte"
   if (!nome) {
     return res.status(400).json({ message: 'O campo "nome" é obrigatório' });
   }
   try {
-    const { rows } = await pool.query('INSERT INTO dispositivo (nome, tipo, comodo_id) VALUES ($1, $2, $3) RETURNING *',
-      [nome, tipo, comodoId]);
+    const { rows } = await pool.query('INSERT INTO dispositivo (nome, ligado, comodo_id) VALUES ($1, $2, $3) RETURNING *',
+      [nome, ligado, comodoId]);
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error('Erro ao adicionar dispositivo ao cômodo:', error);
@@ -121,6 +121,29 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Rota para ATUALIZAR apenas o estado (ligado/desligado) de um dispositivo específico em um cômodo
+// Ex: PATCH /api/user/1/houses/5/comodos/10/devices/15/state
+// Espera receber no corpo: { "ligado": true } ou { "ligado": false }
+router.patch('/:id/state', async (req, res) => {
+  const { comodoId } = req; // ID do cômodo vindo da "ponte"
+  const { id } = req.params; // ID do dispositivo vindo da URL
+  const { ligado } = req.body; // Estado (ligado/desligado) vindo do corpo da requisição
+
+  if (ligado === undefined) {
+    return res.status(400).json({ message: 'O campo "ligado" é obrigatório.' });
+  }
+  try {
+    const { rows } = await pool.query('UPDATE dispositivo SET ligado = $1 WHERE dispos_id = $2 AND comodo_id = $3 RETURNING *',
+      [ligado, id, comodoId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Dispositivo não encontrado ou não pertence a este cômodo.' });
+    }
+    res.status(200).json(rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar estado do dispositivo:', error);
+    res.status(500).json({ message: 'Erro ao atualizar dados no banco' });
+  }
+});
 
 // ROTAS DO TIPO DELETE
 // Rota para DELETAR um dispositivo específico de um cômodo

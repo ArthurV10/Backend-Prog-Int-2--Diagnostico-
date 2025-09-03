@@ -127,7 +127,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Rota para ser utilizada como "ponte" para os cômodos
-router.use('/:casaId/rooms', (req, res, next) => {
+router.use('/:casaId/room', (req, res, next) => {
   // Anexa o ID da casa na requisição para que o próximo roteador possa usá-lo
   req.casaId = req.params.casaId;
   next();
